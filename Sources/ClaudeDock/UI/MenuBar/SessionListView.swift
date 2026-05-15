@@ -333,6 +333,17 @@ struct SessionListView: View {
             Text(" independent")
                 .font(Theme.mono(9))
                 .foregroundStyle(Theme.green.opacity(0.7))
+            Text(" · ")
+                .font(Theme.mono(9))
+                .foregroundStyle(Theme.creamDeeper)
+            Button { NSApp.terminate(nil) } label: {
+                Text("quit")
+                    .font(Theme.mono(9, weight: .medium))
+                    .foregroundStyle(Theme.creamDim)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Quit ClaudeDock (or right-click the menu bar icon)")
         }
         .padding(.horizontal, 12)
         .frame(height: 24)

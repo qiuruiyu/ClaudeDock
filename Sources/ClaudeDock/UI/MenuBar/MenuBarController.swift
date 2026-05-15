@@ -27,7 +27,11 @@ final class MenuBarController {
 
         statusItem.button?.image = StatusIconRenderer.image(for: .gray)
         statusItem.button?.target = self
-        statusItem.button?.action = #selector(togglePopover(_:))
+        statusItem.button?.action = #selector(handleStatusItemClick(_:))
+        // Right-click delivers a context menu with Quit; left-click toggles
+        // the popover as before. We can't use statusItem.menu directly —
+        // assigning it would override left-click and hide the popover entry.
+        statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
 
         // Re-render icon whenever sessions change
         store.$sessions
@@ -44,5 +48,30 @@ final class MenuBarController {
         popoverController.toggle(relativeTo: button)
     }
 
-    @objc private func togglePopover(_ sender: Any?) { toggle() }
+    @objc private func handleStatusItemClick(_ sender: Any?) {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            showContextMenu()
+        } else {
+            toggle()
+        }
+    }
+
+    private func showContextMenu() {
+        guard let button = statusItem.button else { return }
+        let menu = NSMenu()
+        let quit = NSMenuItem(title: "Quit ClaudeDock",
+                              action: #selector(quitApp),
+                              keyEquivalent: "q")
+        quit.target = self
+        menu.addItem(quit)
+        // Pop up just below the status bar button. Setting positioning to
+        // nil + an anchor point in the button's coordinate space gives the
+        // same visual placement as the popover.
+        let anchor = NSPoint(x: 0, y: button.frame.height + 4)
+        menu.popUp(positioning: nil, at: anchor, in: button)
+    }
+
+    @objc private func quitApp() {
+        NSApp.terminate(nil)
+    }
 }
