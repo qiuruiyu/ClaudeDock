@@ -1,0 +1,15 @@
+{
+  "description" : "Local marketplace wrapping the ClaudeDock plugin",
+  "name" : "claudedock",
+  "owner" : {
+    "name" : "Joseph Qiu"
+  },
+  "plugins" : [
+    {
+      "description" : "Floating dock for Claude Code session status",
+      "name" : "claudedock",
+      "source" : ".\/claudedock",
+      "version" : "0.1.0"
+    }
+  ]
+}

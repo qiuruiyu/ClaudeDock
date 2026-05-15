@@ -1,0 +1,62 @@
+{
+  "description" : "Floating dock for Claude Code session status",
+  "hooks" : {
+    "Notification" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"${CLAUDE_PLUGIN_ROOT}\/hook.sh\"",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "*"
+      }
+    ],
+    "SessionEnd" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"${CLAUDE_PLUGIN_ROOT}\/hook.sh\"",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "*"
+      }
+    ],
+    "SessionStart" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"${CLAUDE_PLUGIN_ROOT}\/hook.sh\"",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "*"
+      }
+    ],
+    "Stop" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"${CLAUDE_PLUGIN_ROOT}\/hook.sh\"",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "*"
+      }
+    ],
+    "UserPromptSubmit" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"${CLAUDE_PLUGIN_ROOT}\/hook.sh\"",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "*"
+      }
+    ]
+  },
+  "name" : "claudedock",
+  "version" : "0.1.0"
+}

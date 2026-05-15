@@ -4,7 +4,7 @@
 
 ClaudeDock aggregates the live state of every running `claude` session and lets you jump back to the right terminal with one click. It plugs into Claude Code through the **official plugin marketplace** — your `~/.claude/settings.json` is never modified.
 
-![status icon and popover screenshot — coming soon](#)
+![ClaudeDock Icon](assets/icon-1024.png)
 
 ## Why
 
@@ -46,12 +46,14 @@ If you're using the standalone Swift toolchain (no Xcode), the build script auto
 
 ### Plugin registration
 
-On first launch, the wizard shows two commands to paste in any terminal:
+This repo bundles the Claude Code plugin under [`marketplace/`](marketplace/). From the repo root after cloning, run:
 
 ```bash
-claude plugin marketplace add "$HOME/Library/Application Support/ClaudeDock/marketplace"
+claude plugin marketplace add "$(pwd)/marketplace"
 claude plugin install claudedock@claudedock
 ```
+
+ClaudeDock.app also regenerates the same plugin files at `~/Library/Application Support/ClaudeDock/marketplace/` on every launch — both paths are functionally identical. The first-launch wizard inside the app surfaces the Application Support path; you can use whichever is convenient.
 
 Once installed, every `claude` session you start will register with ClaudeDock automatically.
 
