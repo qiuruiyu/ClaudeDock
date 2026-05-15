@@ -23,6 +23,7 @@ mkdir -p "$APP/Contents/Resources"
 
 cp "$EXE" "$APP/Contents/MacOS/ClaudeDock"
 cp "Sources/ClaudeDock/Resources/Info.plist" "$APP/Contents/Info.plist"
+cp "Sources/ClaudeDock/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 touch "$APP"
 

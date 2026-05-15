@@ -20,7 +20,7 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
             ],
             path: "Sources/ClaudeDock",
-            exclude: ["Resources/Info.plist"],
+            exclude: ["Resources/Info.plist", "Resources/AppIcon.icns"],
             resources: []
         ),
         .testTarget(
