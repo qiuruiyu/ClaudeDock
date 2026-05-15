@@ -7,37 +7,39 @@ import Testing
         let a = SessionIdentity.synthesize(sessionId: "s1", cwd: "/Users/joe/x", ppid: 100, tty: "/dev/ttys001")
         let b = SessionIdentity.synthesize(sessionId: "s2", cwd: "/Users/joe/x", ppid: 200, tty: "/dev/ttys002")
         #expect(a.workKey == b.workKey, "Same cwd ⇒ same workKey")
-        #expect(a.fingerprint != b.fingerprint, "Different ppid ⇒ different fingerprint")
+        #expect(a.fingerprint != b.fingerprint, "Different sessionId ⇒ different fingerprint")
     }
 
-    // MARK: - iter-070: TTY must not affect fingerprint
+    // MARK: - iter-071: identity is (cwd, sessionId)
 
-    @Test func samePpidAndCwdProduceSameFingerprintRegardlessOfTty() {
-        // The merge invariant: discovery sees the real TTY (e.g.
-        // "/dev/ttys010") while hook.sh sees its own piped stdin →
-        // tty(1) returns "not a tty" → empty string. Both paths must
-        // produce the SAME fingerprint so SessionStore.ingest finds
-        // and merges into the existing discovered row.
+    @Test func ppidAndTtyDoNotAffectFingerprint() {
+        // The merge invariant after iter-071:
+        //   Discovery → ppid=<claude pid> tty=/dev/ttysN
+        //   Hook      → ppid=<intermediate shell pid> tty="" (piped stdin)
+        // Different ppid AND different tty, but both observe the same
+        // (cwd, sessionId). Must produce the same fingerprint.
         let discovery = SessionIdentity.synthesize(
-            sessionId: "x", cwd: "/x", ppid: 7777, tty: "/dev/ttys010"
+            sessionId: "uuid-abc", cwd: "/x", ppid: 7777, tty: "/dev/ttys010"
         )
         let hook = SessionIdentity.synthesize(
-            sessionId: "x", cwd: "/x", ppid: 7777, tty: nil
+            sessionId: "uuid-abc", cwd: "/x", ppid: 12345, tty: nil
         )
-        let hookEmpty = SessionIdentity.synthesize(
-            sessionId: "x", cwd: "/x", ppid: 7777, tty: ""
+        let hookEmptyTty = SessionIdentity.synthesize(
+            sessionId: "uuid-abc", cwd: "/x", ppid: 9876, tty: ""
         )
-        #expect(discovery.fingerprint == hook.fingerprint)
-        #expect(discovery.fingerprint == hookEmpty.fingerprint)
+        #expect(discovery.fingerprint == hook.fingerprint,
+                "Discovery and hook see different ppid/tty but same sessionId → must merge")
+        #expect(discovery.fingerprint == hookEmptyTty.fingerprint)
     }
 
-    @Test func differentPpidStillProducesDifferentFingerprintInSameCwd() {
-        // Two distinct claude processes in the same CWD must still be
-        // distinguishable — they're legitimately different sessions.
-        let a = SessionIdentity.synthesize(sessionId: "x", cwd: "/x", ppid: 100, tty: nil)
-        let b = SessionIdentity.synthesize(sessionId: "x", cwd: "/x", ppid: 200, tty: nil)
+    @Test func differentSessionIdsInSameCwdAreDistinguishable() {
+        // Two concurrent claude sessions in the same CWD must remain
+        // distinguishable — they're legitimately different sessions
+        // with different session_ids.
+        let a = SessionIdentity.synthesize(sessionId: "session-A", cwd: "/x", ppid: 100, tty: nil)
+        let b = SessionIdentity.synthesize(sessionId: "session-B", cwd: "/x", ppid: 100, tty: nil)
         #expect(a.fingerprint != b.fingerprint)
-        #expect(a.workKey == b.workKey, "Both share the workspace; just different processes")
+        #expect(a.workKey == b.workKey, "Both share the workspace; just different sessions")
     }
 
     @Test func workKeyDifferentForDifferentCwd() {
