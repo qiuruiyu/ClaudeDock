@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaudeDock — Manage every Claude Code session from your menu bar</title>
+<meta name="description" content="ClaudeDock is an open-source macOS menu-bar app that aggregates the live state of every running Claude Code session. Click-to-focus terminal, optional flash banner, never modifies ~/.claude/settings.json.">
+
+<meta property="og:title" content="ClaudeDock">
+<meta property="og:description" content="macOS menu-bar app for managing multiple concurrent Claude Code sessions">
+<meta property="og:image" content="https://qiuruiyu.github.io/ClaudeDock/icon-512.png">
+<meta property="og:url" content="https://qiuruiyu.github.io/ClaudeDock/">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" type="image/png" href="icon-256.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --ink: #0e0d0c;
+  --ink-2: #14110d;
+  --cream: #e8e2d4;
+  --cream-dim: rgba(232, 226, 212, 0.62);
+  --cream-deeper: rgba(232, 226, 212, 0.4);
+  --cream-faint: rgba(232, 226, 212, 0.14);
+  --amber: #f0a742;
+  --amber-soft: rgba(240, 167, 66, 0.18);
+  --red: #d9534f;
+  --yellow: #e8b948;
+  --green: #7fb069;
+  --gray: #5c5852;
+  --hairline: rgba(232, 226, 212, 0.08);
+  --hairline-2: rgba(232, 226, 212, 0.16);
+  --surface-1: rgba(255, 246, 230, 0.03);
+  --surface-2: rgba(255, 246, 230, 0.06);
+
+  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { background: var(--ink); scroll-behavior: smooth; }
+body {
+  background: var(--ink);
+  color: var(--cream);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: inherit; }
+
+/* === TOP BAR ============================================================ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--hairline);
+  background: rgba(14, 13, 12, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.topbar-inner {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+}
+.topbar .brand { font-weight: 500; letter-spacing: 0.02em; color: var(--cream); }
+.topbar .brand .slash { color: var(--amber); }
+.topbar .right {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  color: var(--cream-deeper);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.topbar .right a {
+  color: var(--cream-dim);
+  text-decoration: none;
+  transition: color 0.12s;
+}
+.topbar .right a:hover { color: var(--amber); }
+
+/* === LAYOUT ============================================================= */
+.container { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 72px 0; border-bottom: 1px solid var(--hairline); }
+.section:last-of-type { border-bottom: 0; }
+
+.section-label {
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-label::before {
+  content: "";
+  display: inline-block;
+  width: 18px;
+  height: 1px;
+  background: var(--amber);
+}
+.section h2 {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.012em;
+  color: var(--cream);
+  margin-bottom: 18px;
+  line-height: 1.2;
+}
+.section .lede {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.65;
+  color: var(--cream-dim);
+  max-width: 620px;
+  margin-bottom: 8px;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  background: var(--surface-1);
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: var(--amber);
+  border: 1px solid var(--hairline);
+}
+
+/* === HERO =============================================================== */
+.hero {
+  padding: 96px 0 80px;
+  text-align: center;
+  border-bottom: 1px solid var(--hairline);
+  position: relative;
+}
+.hero-icon {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 32px;
+  display: block;
+  filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.55));
+}
+.hero h1 {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 46px;
+  letter-spacing: -0.022em;
+  color: var(--cream);
+  margin-bottom: 20px;
+  line-height: 1.05;
+}
+.hero h1 .slash { color: var(--amber); margin: 0 1px; }
+.hero h1 .caret {
+  display: inline-block;
+  width: 14px;
+  height: 38px;
+  background: var(--amber);
+  margin-left: 4px;
+  vertical-align: text-bottom;
+  animation: blink 1.1s steps(2, end) infinite;
+}
+@keyframes blink { 50%, 100% { opacity: 0; } }
+
+.hero .tagline {
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--cream-dim);
+  max-width: 540px;
+  margin: 0 auto 38px;
+  line-height: 1.55;
+}
+
+.cta-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 64px;
+}
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 22px;
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.cta.primary { background: var(--amber); color: var(--ink); }
+.cta.primary:hover {
+  background: #ffba5e;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(240, 167, 66, 0.28);
+}
+.cta.secondary {
+  background: transparent;
+  color: var(--cream);
+  border-color: var(--hairline-2);
+}
+.cta.secondary:hover { border-color: var(--amber); color: var(--amber); }
+.cta .arrow { transition: transform 0.2s; }
+.cta:hover .arrow { transform: translateX(3px); }
+.cta.secondary:hover .arrow { transform: translateY(3px); }
+
+/* === HERO PREVIEW (mock popover) ======================================== */
+.preview-wrap {
+  max-width: 380px;
+  margin: 0 auto;
+  position: relative;
+}
+.preview-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -24px 50% auto 50%;
+  height: 24px;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, var(--hairline-2));
+}
+.popover-mock {
+  background: var(--ink);
+  border: 1px solid var(--hairline-2);
+  border-radius: 12px;
+  box-shadow:
+    0 1px 0 rgba(255, 246, 230, 0.04) inset,
+    0 32px 80px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  text-align: left;
+  font-family: var(--mono);
+}
+.popover-mock .h {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+.popover-mock .h-left { display: flex; align-items: center; gap: 9px; font-size: 11px; }
+.popover-mock .agg-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  position: relative;
+}
+.popover-mock .agg-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: var(--red);
+  opacity: 0.4;
+  animation: ring 1.6s ease-out infinite;
+}
+@keyframes ring {
+  0% { transform: scale(1); opacity: 0.45; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+.popover-mock .agg-num { color: var(--amber); font-weight: 600; }
+.popover-mock .agg-alert { color: var(--red); margin-left: 6px; font-weight: 500; }
+.popover-mock .h-icons { display: flex; gap: 6px; color: var(--cream-dim); font-size: 13px; }
+.popover-mock .fchip {
+  height: 30px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--hairline);
+}
+.popover-mock .chip {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  color: var(--cream-dim);
+}
+.popover-mock .chip.active { background: var(--amber); color: var(--ink); font-weight: 500; }
+.popover-mock .recent {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--cream-deeper);
+  text-transform: uppercase;
+}
+.popover-mock .row {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px 12px 17px;
+  position: relative;
+}
+.popover-mock .row + .row { border-top: 1px solid transparent; }
+.popover-mock .rail {
+  position: absolute;
+  left: 0;
+  top: 8px; bottom: 8px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+}
+.popover-mock .rail.red { background: var(--red); }
+.popover-mock .rail.yellow { background: var(--yellow); }
+.popover-mock .rail.green { background: var(--green); }
+.popover-mock .row .body { flex: 1; min-width: 0; }
+.popover-mock .row .name { font-size: 13px; color: var(--cream); display: flex; align-items: center; gap: 7px; }
+.popover-mock .row .tag {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 2px;
+}
+.popover-mock .row .idx { font-size: 10px; color: var(--cream-deeper); }
+.popover-mock .row .meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  font-weight: 500;
+}
+.popover-mock .row .meta .stat.red { color: var(--red); }
+.popover-mock .row .meta .stat.yellow { color: var(--yellow); }
+.popover-mock .row .meta .stat.green { color: var(--green); }
+.popover-mock .row .meta .dim { color: var(--cream-deeper); font-weight: 400; }
+.popover-mock .foot {
+  height: 24px;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  font-size: 9px;
+  color: var(--cream-deeper);
+}
+.popover-mock .indep {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(127, 176, 105, 0.75);
+}
+.popover-mock .indep::before {
+  content: "";
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+/* === FEATURES =========================================================== */
+.features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 36px;
+}
+.feature {
+  padding: 26px 22px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--surface-1);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.feature:hover { border-color: var(--hairline-2); transform: translateY(-2px); }
+.feature .num {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 16px;
+  display: block;
+}
+.feature h3 {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--cream);
+  margin-bottom: 12px;
+  letter-spacing: -0.005em;
+  line-height: 1.4;
+}
+.feature p {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--cream-dim);
+  line-height: 1.62;
+}
+.feature p code {
+  font-size: 11.5px;
+  padding: 0 4px;
+}
+@media (max-width: 720px) {
+  .features { grid-template-columns: 1fr; }
+}
+
+/* === DIAGRAM ============================================================ */
+.diagram {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--cream-dim);
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 26px 28px;
+  margin: 28px 0 0;
+  overflow-x: auto;
+  white-space: pre;
+}
+.diagram .a { color: var(--amber); }
+.diagram .d { color: var(--cream-deeper); }
+.diagram .r { color: var(--red); }
+.diagram .y { color: var(--yellow); }
+.diagram .g { color: var(--green); }
+
+/* === INSTALL ============================================================ */
+.install-steps { display: grid; gap: 18px; margin-top: 32px; }
+.step {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 24px;
+  align-items: start;
+  padding: 24px 26px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--surface-1);
+}
+.step .step-num {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber);
+  letter-spacing: 0.1em;
+}
+.step .step-num small {
+  display: block;
+  font-size: 8.5px;
+  letter-spacing: 0.22em;
+  color: var(--cream-deeper);
+  margin-top: 4px;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+.step h3 {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--cream);
+  margin-bottom: 6px;
+}
+.step .hint {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--cream-dim);
+  margin-bottom: 14px;
+  line-height: 1.55;
+}
+.step .codeblock {
+  position: relative;
+  background: var(--ink);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  overflow-x: auto;
+}
+.step pre {
+  margin: 0;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--cream);
+  line-height: 1.7;
+}
+.step pre .p { color: var(--amber); user-select: none; margin-right: 6px; }
+.step pre .c { color: var(--cream-deeper); }
+.step .copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  background: var(--surface-2);
+  color: var(--cream-dim);
+  border: 1px solid var(--hairline-2);
+  padding: 4px 9px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.step .copy:hover { color: var(--amber); border-color: var(--amber); }
+.step .copy.copied { color: var(--green); border-color: var(--green); }
+@media (max-width: 600px) {
+  .step { grid-template-columns: 1fr; gap: 14px; padding: 20px 18px; }
+  .step pre { font-size: 11.5px; padding: 12px 14px; }
+}
+
+/* === INDEPENDENCE ======================================================== */
+.indep-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: rgba(127, 176, 105, 0.08);
+  border: 1px solid rgba(127, 176, 105, 0.25);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: 22px;
+}
+.indep-badge::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(127, 176, 105, 0.18);
+}
+.indep-detail {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin-top: 30px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--surface-1);
+  overflow: hidden;
+}
+.indep-fact { padding: 22px 24px; }
+.indep-fact + .indep-fact { border-left: 1px solid var(--hairline); }
+.indep-fact .label {
+  display: block;
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.indep-fact .value {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--cream);
+  line-height: 1.5;
+  word-break: break-all;
+}
+.indep-fact .none {
+  color: var(--cream-deeper);
+  font-style: italic;
+}
+@media (max-width: 720px) {
+  .indep-detail { grid-template-columns: 1fr; }
+  .indep-fact + .indep-fact { border-left: 0; border-top: 1px solid var(--hairline); }
+}
+
+/* === FOOTER ============================================================= */
+footer {
+  padding: 48px 24px 64px;
+  text-align: center;
+  border-top: 1px solid var(--hairline);
+}
+footer .row {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--cream-deeper);
+  letter-spacing: 0.1em;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+footer .row a {
+  color: var(--cream-dim);
+  text-decoration: none;
+  transition: color 0.12s;
+}
+footer .row a:hover { color: var(--amber); }
+footer .row .sep { opacity: 0.4; }
+footer .ver { color: var(--amber); font-weight: 500; }
+
+/* === STAGGERED HERO REVEAL =============================================== */
+.hero > * {
+  opacity: 0;
+  animation: rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+.hero-icon { animation-delay: 0.06s; }
+.hero h1 { animation-delay: 0.14s; }
+.hero .tagline { animation-delay: 0.22s; }
+.cta-row { animation-delay: 0.30s; }
+.preview-wrap { animation-delay: 0.42s; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* === SMALL SCREENS ====================================================== */
+@media (max-width: 600px) {
+  .hero { padding: 64px 0 56px; }
+  .hero-icon { width: 80px; height: 80px; margin-bottom: 24px; }
+  .hero h1 { font-size: 32px; }
+  .hero h1 .caret { height: 28px; width: 10px; }
+  .hero .tagline { font-size: 15px; }
+  .section h2 { font-size: 22px; }
+  .section { padding: 56px 0; }
+  .container, .topbar-inner { padding-left: 18px; padding-right: 18px; }
+  .topbar .right { font-size: 9px; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">claudedock<span class="slash">/</span>v1.1</div>
+    <nav class="right">
+      <a href="#install">install</a>
+      <a href="https://github.com/qiuruiyu/ClaudeDock" target="_blank" rel="noopener">github →</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ============================== HERO ============================== -->
+<section class="hero container">
+  <img src="icon-256.png" alt="ClaudeDock icon" class="hero-icon">
+  <h1>claudedock<span class="slash">/</span><span class="caret"></span></h1>
+  <p class="tagline">Manage every running Claude Code session from your menu bar.</p>
+  <div class="cta-row">
+    <a href="https://github.com/qiuruiyu/ClaudeDock" target="_blank" rel="noopener" class="cta primary">
+      view on github <span class="arrow">→</span>
+    </a>
+    <a href="#install" class="cta secondary">
+      install <span class="arrow">↓</span>
+    </a>
+  </div>
+
+  <div class="preview-wrap" aria-hidden="true">
+    <div class="popover-mock">
+      <div class="h">
+        <div class="h-left">
+          <div class="agg-dot"></div>
+          <div><span class="agg-num">3</span> sessions <span class="agg-alert">1 waiting</span></div>
+        </div>
+        <div class="h-icons"><span>⌕</span><span>⚙</span></div>
+      </div>
+      <div class="fchip">
+        <span class="chip active">project</span>
+        <span class="chip">repo</span>
+        <span class="chip">color</span>
+        <span class="chip">status</span>
+        <span class="recent">↓ recent</span>
+      </div>
+      <div class="row">
+        <div class="rail red"></div>
+        <div class="body">
+          <div class="name">
+            <span class="tag" style="background: #5b9bd5"></span>
+            <span>claude_chat</span>
+            <span class="idx">·2</span>
+          </div>
+          <div class="meta">
+            <span class="stat red">NEEDS INPUT</span>
+            <span class="dim"> · 7c1ae3 · 34s</span>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="rail yellow"></div>
+        <div class="body">
+          <div class="name">
+            <span class="tag" style="background: #b07ec2"></span>
+            <span>superpowers-cli</span>
+          </div>
+          <div class="meta">
+            <span class="stat yellow">THINKING</span>
+            <span class="dim"> · a8f221 · 2m</span>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="rail green"></div>
+        <div class="body">
+          <div class="name">
+            <span class="tag" style="background: #7fb069"></span>
+            <span>notes-app</span>
+            <span class="idx">·1</span>
+          </div>
+          <div class="meta">
+            <span class="stat green">IDLE</span>
+            <span class="dim"> · 3d4e09 · 11m</span>
+          </div>
+        </div>
+      </div>
+      <div class="foot">
+        <span>⏎ focus · ⌘, settings</span>
+        <span class="indep">independent</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== WHAT IT DOES ============================ -->
+<section class="section container" id="features">
+  <div class="section-label">what it does</div>
+  <h2>Three jobs, executed precisely.</h2>
+  <p class="lede">No dashboards, no analytics, no streaks. Each surface answers exactly one question.</p>
+
+  <div class="features">
+    <article class="feature">
+      <span class="num">01 · glance</span>
+      <h3>Aggregate status in the menu bar.</h3>
+      <p>The icon turns <code style="color:var(--red);background:transparent;border-color:transparent">red</code> when any session is blocked on you, <code style="color:var(--yellow);background:transparent;border-color:transparent">yellow</code> while one is thinking, <code style="color:var(--green);background:transparent;border-color:transparent">green</code> when everything's idle. One click for the full list.</p>
+    </article>
+    <article class="feature">
+      <span class="num">02 · jump</span>
+      <h3>Click a row, focus the terminal.</h3>
+      <p>iTerm and Terminal.app get a precise tab focus via AppleScript. Ghostty, Warp, VS Code, and Cursor get window activation with an explanatory toast.</p>
+    </article>
+    <article class="feature">
+      <span class="num">03 · notify</span>
+      <h3>Optional flash banner under the menu bar.</h3>
+      <p>Five-second slide-in from the top edge when a session needs input or finishes. Sits flush with the menu bar; tucks under the notch on notched Macs. Never doubles up with the system banner.</p>
+    </article>
+  </div>
+</section>
+
+<!-- =========================== HOW IT WORKS ============================ -->
+<section class="section container" id="how">
+  <div class="section-label">how it works</div>
+  <h2>One hook script, one localhost server, one menu bar icon.</h2>
+  <p class="lede">Claude Code's official plugin system fires five hook events per session (<code>SessionStart</code>, <code>UserPromptSubmit</code>, <code>Notification</code>, <code>Stop</code>, <code>SessionEnd</code>). A tiny shell script forwards each to a swift-nio server bound to <code>127.0.0.1</code>. The menu-bar app fuses those events with process heartbeats and transcript file mtimes into a single status per session.</p>
+
+  <pre class="diagram">  <span class="d">┌──────────────┐         ┌────────────┐         ┌────────────┐</span>
+  <span class="d">│  your        │         │            │         │            │</span>
+  <span class="d">│  terminal    │  ─────► │   claude   │  ─────► │  hook.sh   │</span>
+  <span class="d">│              │         │    CLI     │         │            │</span>
+  <span class="d">└──────────────┘         └────────────┘         └─────┬──────┘</span>
+                                                       <span class="d">│</span>
+                                          <span class="a">POST /hook  +  hint</span>
+                                                       <span class="d">│</span>
+                                                       <span class="d">▼</span>
+                                              <span class="d">┌────────────────────┐</span>
+                                              <span class="d">│ 127.0.0.1:</span><span class="a">RANDOM</span><span class="d">   │</span>
+                                              <span class="d">│  HookServer (NIO)  │</span>
+                                              <span class="d">└─────────┬──────────┘</span>
+                                                        <span class="d">│</span>
+                                                        <span class="d">▼</span>
+                                              <span class="d">┌────────────────────┐</span>
+                                              <span class="d">│  </span><span class="r">●</span><span class="d"> menu-bar icon   │</span>
+                                              <span class="d">│  + popover         │</span>
+                                              <span class="d">│  + flash banner    │</span>
+                                              <span class="d">└────────────────────┘</span></pre>
+</section>
+
+<!-- ============================= INSTALL =============================== -->
+<section class="section container" id="install">
+  <div class="section-label">install</div>
+  <h2>Three steps. About 90 seconds.</h2>
+  <p class="lede">Requires macOS 14+ and Swift 6.0+ (standalone <a href="https://www.swift.org/install/macos/" target="_blank" rel="noopener" style="color:var(--amber);text-decoration:none;border-bottom:1px solid var(--amber-soft)">toolchain</a> or Xcode 16+).</p>
+
+  <div class="install-steps">
+    <div class="step">
+      <div class="step-num">01<small>clone</small></div>
+      <div>
+        <h3>Grab the source.</h3>
+        <p class="hint">Public repo on GitHub. ~1 MB, no submodules.</p>
+        <div class="codeblock">
+          <button class="copy" data-copy="git clone https://github.com/qiuruiyu/ClaudeDock.git
+cd ClaudeDock">copy</button>
+          <pre><span class="p">$</span>git clone https://github.com/qiuruiyu/ClaudeDock.git
+<span class="p">$</span>cd ClaudeDock</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">02<small>build</small></div>
+      <div>
+        <h3>Build the .app.</h3>
+        <p class="hint">The script sources the standalone toolchain into PATH automatically, then assembles a proper macOS bundle.</p>
+        <div class="codeblock">
+          <button class="copy" data-copy="bash Scripts/build-app.sh release
+cp -R .build/ClaudeDock.app /Applications/
+open /Applications/ClaudeDock.app">copy</button>
+          <pre><span class="p">$</span>bash Scripts/build-app.sh release
+<span class="p">$</span>cp -R .build/ClaudeDock.app /Applications/
+<span class="p">$</span>open /Applications/ClaudeDock.app</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">03<small>plugin</small></div>
+      <div>
+        <h3>Register with Claude Code.</h3>
+        <p class="hint">From the repo root. The marketplace directory contains the plugin manifest; the app generates an identical copy at <code>~/Library/Application Support/ClaudeDock/marketplace/</code> on launch.</p>
+        <div class="codeblock">
+          <button class="copy" data-copy='claude plugin marketplace add "$(pwd)/marketplace"
+claude plugin install claudedock@claudedock'>copy</button>
+          <pre><span class="p">$</span>claude plugin marketplace add "$(pwd)/marketplace"
+<span class="p">$</span>claude plugin install claudedock@claudedock</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ INDEPENDENCE ============================ -->
+<section class="section container" id="independence">
+  <div class="section-label">independence invariant</div>
+  <h2>It never touches your settings.json.</h2>
+  <div class="indep-badge">verified at runtime</div>
+  <p class="lede">Every Claude Code integration goes through the official <code>claude plugin install</code> / <code>claude plugin uninstall</code> CLI commands. ClaudeDock never reads or writes <code>~/.claude/settings.json</code> directly. Settings → Diagnostics → "Run Independence Check" hashes the file with SHA-256 and compares against a baseline you can capture on demand — so the guarantee is verifiable, not just claimed.</p>
+
+  <div class="indep-detail">
+    <div class="indep-fact">
+      <span class="label">writes to</span>
+      <span class="value">~/Library/Application Support/ClaudeDock/</span>
+    </div>
+    <div class="indep-fact">
+      <span class="label">touches in ~/.claude/</span>
+      <span class="value none">— nothing —</span>
+    </div>
+    <div class="indep-fact">
+      <span class="label">network</span>
+      <span class="value">127.0.0.1 only</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== FOOTER =============================== -->
+<footer>
+  <div class="row">
+    <span>claudedock<span style="color:var(--amber)">/</span><span class="ver">v1.1</span></span>
+    <span class="sep">·</span>
+    <a href="https://github.com/qiuruiyu/ClaudeDock" target="_blank" rel="noopener">github</a>
+    <span class="sep">·</span>
+    <a href="https://github.com/qiuruiyu/ClaudeDock/blob/master/LICENSE" target="_blank" rel="noopener">MIT</a>
+    <span class="sep">·</span>
+    <span>built for the macOS terminal</span>
+  </div>
+</footer>
+
+<script>
+// Copy-to-clipboard for install snippets.
+document.querySelectorAll('.copy').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var text = btn.getAttribute('data-copy');
+    if (!text) return;
+    var done = function() {
+      var original = btn.textContent;
+      btn.textContent = 'copied ✓';
+      btn.classList.add('copied');
+      setTimeout(function() {
+        btn.textContent = original;
+        btn.classList.remove('copied');
+      }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function() {
+        // Fallback: textarea + execCommand
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); done(); }
+        finally { document.body.removeChild(ta); }
+      });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); }
+      finally { document.body.removeChild(ta); }
+    }
+  });
+});
+</script>
+
+</body>
+</html>
