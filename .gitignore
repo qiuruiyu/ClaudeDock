@@ -1,0 +1,24 @@
+# Swift / SPM
+.build/
+build/
+DerivedData/
+
+# Xcode
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Local dev
+.env
+*.local.json
+
+# Installer packages (toolchain installers etc., kept local only)
+*.pkg
