@@ -160,4 +160,117 @@ import Testing
         let bAfter = store.sessions.first { $0.identity.sessionId == "bbb" }!
         #expect(bAfter.status == .thinking)
     }
+
+    // MARK: - injectDiscovered
+
+    @Test func injectDiscoveredAddsNewSession() {
+        let store = SessionStore(aliases: AliasStore(fileURL: tmp()))
+        let identity = SessionIdentity.synthesize(sessionId: "s1", cwd: "/x",
+                                                  ppid: 123, tty: "/dev/ttys001")
+        store.injectDiscovered(identity: identity,
+                               transcriptPath: "/x/.t.jsonl",
+                               status: .idle,
+                               lastEventAt: Date(timeIntervalSince1970: 1000))
+        #expect(store.sessions.count == 1)
+        #expect(store.sessions.first?.status == .idle)
+        #expect(store.sessions.first?.transcriptPath == "/x/.t.jsonl")
+    }
+
+    @Test func injectDiscoveredSkipsIfAlreadyTracked() {
+        let store = SessionStore(aliases: AliasStore(fileURL: tmp()))
+        // Hook arrives first → creates session with status=.starting then engine
+        // transitions to .idle on Stop.
+        store.ingest(event: HookEvent(sessionId: "s1", cwd: "/x",
+                                       hookEventName: .sessionStart,
+                                       transcriptPath: "/x/.t.jsonl"),
+                     hint: TerminalHint(ppid: 7777, tty: "/dev/ttys009"))
+        store.ingest(event: HookEvent(sessionId: "s1", cwd: "/x",
+                                       hookEventName: .stop,
+                                       transcriptPath: "/x/.t.jsonl"),
+                     hint: TerminalHint(ppid: 7777, tty: "/dev/ttys009"))
+        let preStatus = store.sessions.first!.status
+        #expect(preStatus == .idle)
+        // Then discovery runs → same fingerprint → must be a no-op (not
+        // overwriting the .idle from the hook flow).
+        let identity = SessionIdentity.synthesize(sessionId: "s1", cwd: "/x",
+                                                  ppid: 7777, tty: "/dev/ttys009")
+        store.injectDiscovered(identity: identity,
+                               transcriptPath: "/x/.t.jsonl",
+                               status: .thinking,
+                               lastEventAt: Date())
+        #expect(store.sessions.count == 1)
+        #expect(store.sessions.first?.status == .idle, "Discovery must not overwrite hook-tracked status")
+    }
+
+    @Test func hookEventAfterDiscoveryMergesNotDuplicates() {
+        let store = SessionStore(aliases: AliasStore(fileURL: tmp()))
+        // Discovery happens first.
+        let identity = SessionIdentity.synthesize(sessionId: "s1", cwd: "/x",
+                                                  ppid: 555, tty: "/dev/ttys001")
+        store.injectDiscovered(identity: identity,
+                               transcriptPath: "/x/.t.jsonl",
+                               status: .idle,
+                               lastEventAt: Date(timeIntervalSince1970: 1000))
+        #expect(store.sessions.count == 1)
+        // Then a real hook for the same session — must merge, not duplicate.
+        store.ingest(event: HookEvent(sessionId: "s1", cwd: "/x",
+                                       hookEventName: .userPromptSubmit,
+                                       transcriptPath: "/x/.t.jsonl"),
+                     hint: TerminalHint(ppid: 555, tty: "/dev/ttys001"))
+        #expect(store.sessions.count == 1, "Hook must merge into discovered row, not duplicate")
+        #expect(store.sessions.first?.status == .thinking)
+    }
+
+    @Test func injectDiscoveredRespectsForgottenIds() {
+        let store = SessionStore(aliases: AliasStore(fileURL: tmp()))
+        let identity = SessionIdentity.synthesize(sessionId: "s1", cwd: "/x",
+                                                  ppid: 9, tty: nil)
+        store.forget(sessionId: identity.fingerprint)
+        store.injectDiscovered(identity: identity,
+                               transcriptPath: "/x/.t.jsonl",
+                               status: .idle,
+                               lastEventAt: Date())
+        #expect(store.sessions.isEmpty, "Forgotten sessions must stay forgotten through discovery")
+    }
+
+    // MARK: - markEnded (iter-066)
+
+    @Test func markEndedTransitionsToEnded() {
+        let store = SessionStore(aliases: AliasStore(fileURL: tmp()))
+        store.ingest(event: HookEvent(sessionId: "s1", cwd: "/x",
+                                       hookEventName: .sessionStart,
+                                       transcriptPath: "/x/.t.jsonl"),
+                     hint: TerminalHint(ppid: 100))
+        let id = store.sessions[0].id
+        #expect(store.sessions[0].status != .ended)
+        store.markEnded(sessionId: id)
+        #expect(store.sessions[0].status == .ended)
+    }
+
+    @Test func markEndedIsIdempotent() {
+        let store = SessionStore(aliases: AliasStore(fileURL: tmp()))
+        store.ingest(event: HookEvent(sessionId: "s1", cwd: "/x",
+                                       hookEventName: .sessionStart,
+                                       transcriptPath: "/x/.t.jsonl"),
+                     hint: TerminalHint(ppid: 100))
+        let id = store.sessions[0].id
+        store.markEnded(sessionId: id)
+        let firstTime = store.sessions[0].lastEventAt
+        // Second call should be a no-op — status already .ended, no
+        // bump to lastEventAt.
+        store.markEnded(sessionId: id)
+        #expect(store.sessions[0].lastEventAt == firstTime)
+    }
+
+    @Test func markEndedUnknownIdNoOps() {
+        let store = SessionStore(aliases: AliasStore(fileURL: tmp()))
+        store.ingest(event: HookEvent(sessionId: "s1", cwd: "/x",
+                                       hookEventName: .sessionStart,
+                                       transcriptPath: "/x/.t.jsonl"),
+                     hint: TerminalHint(ppid: 100))
+        let initialStatus = store.sessions[0].status
+        store.markEnded(sessionId: "not-a-real-fingerprint")
+        #expect(store.sessions.count == 1)
+        #expect(store.sessions[0].status == initialStatus)
+    }
 }

@@ -68,6 +68,46 @@ final class SessionStore: ObservableObject {
         objectWillChange.send()
     }
 
+    /// Mark a session as ended without going through StatusEngine. Used by
+    /// ProcessExitWatcher when a claude process dies abruptly (terminal
+    /// close, SIGKILL, crash) and never fires its own SessionEnd hook.
+    /// Idempotent — no-ops if the session is already .ended or unknown.
+    func markEnded(sessionId: String) {
+        guard let idx = sessions.firstIndex(where: { $0.id == sessionId }) else { return }
+        if sessions[idx].status == .ended { return }
+        sessions[idx].status = .ended
+        sessions[idx].lastEventAt = Date()
+        recomputeSameCwdIndices()
+        objectWillChange.send()
+    }
+
+    /// Inject a session reconstructed from process enumeration + transcript
+    /// inspection at launch time. Bypasses `StatusEngine` (which encodes
+    /// hook-driven transitions) and writes the inferred status directly.
+    /// Returns early if the fingerprint is already tracked or forgotten —
+    /// when a real hook later fires for the same `(cwd, ppid, tty)` triple,
+    /// the existing fingerprint-match logic in `ingest` merges it.
+    func injectDiscovered(identity: SessionIdentity,
+                          transcriptPath: String,
+                          status: SessionStatus,
+                          lastEventAt: Date) {
+        if forgottenIds.contains(identity.fingerprint) { return }
+        if sessions.contains(where: { $0.identity.fingerprint == identity.fingerprint }) {
+            return
+        }
+        _ = colors.color(forWorkKey: identity.workKey, in: aliases)
+        aliases.touch(workKey: identity.workKey)
+        let s = Session(id: identity.fingerprint,
+                        identity: identity,
+                        status: status,
+                        lastEventAt: lastEventAt,
+                        transcriptPath: transcriptPath,
+                        hint: TerminalHint())
+        sessions.append(s)
+        try? aliases.save()
+        recomputeSameCwdIndices()
+    }
+
     // MARK: - #N auto-numbering
 
     private func recomputeSameCwdIndices() {

@@ -14,7 +14,7 @@ final class MenuBarController {
     private let onHotkeyChange: () -> Void
     private let popoverController: PopoverController
 
-    init(store: SessionStore, aliases: AliasStore, prefs: PreferencesStore, focuser: TerminalFocuser, loginItem: LoginItemController, latency: LatencyTracker, onHotkeyChange: @escaping () -> Void) {
+    init(store: SessionStore, aliases: AliasStore, prefs: PreferencesStore, focuser: TerminalFocuser, loginItem: LoginItemController, latency: LatencyTracker, onHotkeyChange: @escaping () -> Void, onRefresh: @escaping () -> Void) {
         self.store = store
         self.aliases = aliases
         self.prefs = prefs
@@ -23,7 +23,7 @@ final class MenuBarController {
         self.latency = latency
         self.onHotkeyChange = onHotkeyChange
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        self.popoverController = PopoverController(store: store, aliases: aliases, prefs: prefs, focuser: focuser, loginItem: loginItem, latency: latency, onHotkeyChange: onHotkeyChange)
+        self.popoverController = PopoverController(store: store, aliases: aliases, prefs: prefs, focuser: focuser, loginItem: loginItem, latency: latency, onHotkeyChange: onHotkeyChange, onRefresh: onRefresh)
 
         statusItem.button?.image = StatusIconRenderer.image(for: .gray)
         statusItem.button?.target = self

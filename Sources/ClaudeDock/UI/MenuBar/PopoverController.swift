@@ -12,9 +12,10 @@ final class PopoverController: NSObject, NSPopoverDelegate {
     private let loginItem: LoginItemController
     private let latency: LatencyTracker
     private let onHotkeyChange: () -> Void
+    private let onRefresh: () -> Void
     private var clickMonitor: Any?
 
-    init(store: SessionStore, aliases: AliasStore, prefs: PreferencesStore, focuser: TerminalFocuser, loginItem: LoginItemController, latency: LatencyTracker, onHotkeyChange: @escaping () -> Void) {
+    init(store: SessionStore, aliases: AliasStore, prefs: PreferencesStore, focuser: TerminalFocuser, loginItem: LoginItemController, latency: LatencyTracker, onHotkeyChange: @escaping () -> Void, onRefresh: @escaping () -> Void) {
         self.store = store
         self.aliases = aliases
         self.prefs = prefs
@@ -22,6 +23,7 @@ final class PopoverController: NSObject, NSPopoverDelegate {
         self.loginItem = loginItem
         self.latency = latency
         self.onHotkeyChange = onHotkeyChange
+        self.onRefresh = onRefresh
         super.init()
 
         popover.behavior = .transient
@@ -38,6 +40,7 @@ final class PopoverController: NSObject, NSPopoverDelegate {
             loginItem: loginItem,
             latency: latency,
             onHotkeyChange: onHotkeyChange,
+            onRefresh: onRefresh,
             onDismiss: { [weak self] in self?.popover.performClose(nil) }
         )
         popover.contentViewController = NSHostingController(rootView: root)

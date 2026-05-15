@@ -6,6 +6,7 @@ struct SessionListView: View {
     let aliases: AliasStore
     let focuser: TerminalFocuser
     let onGearTap: () -> Void
+    let onRefresh: () -> Void
     let onDismiss: () -> Void
     private let resolver = NameResolver()
 
@@ -115,6 +116,7 @@ struct SessionListView: View {
             iconButton(systemName: "magnifyingglass", tip: "Search") {
                 withAnimation(.easeInOut(duration: 0.15)) { showSearch.toggle() }
             }
+            iconButton(systemName: "arrow.clockwise", tip: "Refresh sessions", action: onRefresh)
             iconButton(systemName: "gearshape", tip: "Settings", action: onGearTap)
         }
         .frame(height: 38)

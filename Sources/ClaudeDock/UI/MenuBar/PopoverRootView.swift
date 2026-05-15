@@ -16,6 +16,7 @@ struct PopoverRootView: View {
     let loginItem: LoginItemController
     let latency: LatencyTracker
     let onHotkeyChange: () -> Void
+    let onRefresh: () -> Void
     let onDismiss: () -> Void
 
     var body: some View {
@@ -35,6 +36,7 @@ struct PopoverRootView: View {
                     onGearTap: {
                         withAnimation(.easeInOut(duration: 0.22)) { popoverMode.mode = .settings }
                     },
+                    onRefresh: onRefresh,
                     onDismiss: onDismiss
                 )
                 .transition(.move(edge: .leading).combined(with: .opacity))
