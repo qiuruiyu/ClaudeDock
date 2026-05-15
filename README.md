@@ -1,10 +1,14 @@
-# ClaudeDock
+<p align="center">
+  <img src="assets/icon-256.png" width="120" alt="ClaudeDock">
+</p>
 
-> macOS menu-bar app for managing multiple concurrent Claude Code sessions
+<h1 align="center">ClaudeDock</h1>
+
+<p align="center">
+  <em>macOS menu-bar app for managing multiple concurrent Claude Code sessions</em>
+</p>
 
 ClaudeDock aggregates the live state of every running `claude` session and lets you jump back to the right terminal with one click. It plugs into Claude Code through the **official plugin marketplace** — your `~/.claude/settings.json` is never modified.
-
-![ClaudeDock Icon](assets/icon-1024.png)
 
 ## Why
 
