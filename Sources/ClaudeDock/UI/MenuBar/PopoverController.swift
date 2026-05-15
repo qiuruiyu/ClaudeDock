@@ -68,6 +68,13 @@ final class PopoverController: NSObject, NSPopoverDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            // LSUIElement (menu-bar-only) apps don't automatically become
+            // the active app when the user clicks the status item. Without
+            // activating, the popover opens but the FIRST click inside it
+            // just promotes the app to active — the click action itself
+            // requires a second tap. Force activation here so the first
+            // intra-popover click works on the first try.
+            NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
         }
     }

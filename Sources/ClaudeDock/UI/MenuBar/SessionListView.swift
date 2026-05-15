@@ -456,9 +456,12 @@ struct SessionListView: View {
         switch result {
         case .precise:
             onDismiss()
-        case .activatedAppOnly(let app):
-            toast = "Activated \(app). Precise tab focus isn't supported for this terminal yet."
-            autoDismissToast()
+        case .activatedAppOnly:
+            // The target app was activated — dismiss the popover so it
+            // stops holding key-window status, otherwise macOS leaves
+            // focus on our popover and the user has to click outside
+            // to "complete" the focus switch.
+            onDismiss()
         case .noTerminalHint:
             toast = "No terminal info recorded for this session."
             autoDismissToast()
