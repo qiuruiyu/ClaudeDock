@@ -8,11 +8,16 @@ protocol GenericFocusing: Sendable { @MainActor func activate(app: String) async
 struct TerminalFocuser {
     let iTerm: ITermFocusing?
     let terminalApp: TerminalAppFocusing?
+    let vscode: VSCodeFocusing?
     let generic: GenericFocusing
 
-    init(iTerm: ITermFocusing? = nil, terminalApp: TerminalAppFocusing? = nil, generic: GenericFocusing) {
+    init(iTerm: ITermFocusing? = nil,
+         terminalApp: TerminalAppFocusing? = nil,
+         vscode: VSCodeFocusing? = nil,
+         generic: GenericFocusing) {
         self.iTerm = iTerm
         self.terminalApp = terminalApp
+        self.vscode = vscode
         self.generic = generic
     }
 
@@ -33,6 +38,16 @@ struct TerminalFocuser {
                 if case .precise = r { return r }
             }
             return await generic.activate(app: "Terminal")
+        case "vscode", "vscode-insiders", "cursor":
+            // iter-068 — deep-link to the right workspace window via the
+            // VS Code / Cursor URL scheme. If the URL open fails, fall
+            // through to bare app activation so the user still goes
+            // somewhere useful.
+            if let scheme = VSCodeStrategy.scheme(forTermProgram: term), let vscode {
+                let r = await vscode.focus(cwd: session.identity.cwd, scheme: scheme)
+                if case .precise = r { return r }
+            }
+            return await generic.activate(app: term)
         default:
             return await generic.activate(app: term)
         }

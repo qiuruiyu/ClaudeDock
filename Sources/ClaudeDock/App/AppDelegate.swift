@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.terminalFocuser = TerminalFocuser(
             iTerm: iTermStrategy(),
             terminalApp: TerminalAppStrategy(),
+            vscode: VSCodeStrategy(),
             generic: GenericStrategy()
         )
         self.preferencesStore = PreferencesStore()
@@ -160,7 +161,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.sessionStore.injectDiscovered(identity: r.identity,
                                                        transcriptPath: r.transcriptPath,
                                                        status: r.status,
-                                                       lastEventAt: r.lastEventAt)
+                                                       lastEventAt: r.lastEventAt,
+                                                       hint: r.hint)
                 }
             }
         }

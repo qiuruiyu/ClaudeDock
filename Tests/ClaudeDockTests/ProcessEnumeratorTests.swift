@@ -45,10 +45,22 @@ final class FakeShellRunner: ShellRunning, @unchecked Sendable {
     }
 }
 
+/// Returns a canned env dict per PID. Tests inject this so unit-test
+/// runs don't accidentally read the live process's env.
+struct FakeEnvReader: ProcessEnvReading {
+    let envByPid: [Int32: [String: String]]
+    init(_ envByPid: [Int32: [String: String]] = [:]) {
+        self.envByPid = envByPid
+    }
+    func readEnv(pid: Int32) -> [String: String] {
+        envByPid[pid] ?? [:]
+    }
+}
+
 @Suite struct ProcessEnumeratorTests {
     @Test func emptyWhenNoClaudeProcesses() throws {
         let runner = FakeShellRunner(outputs: ["pgrep": ""])
-        let e = ShellProcessEnumerator(runner: runner)
+        let e = ShellProcessEnumerator(runner: runner, envReader: FakeEnvReader())
         #expect(try e.enumerateClaudeProcesses().isEmpty)
     }
 
@@ -62,7 +74,7 @@ final class FakeShellRunner: ShellRunning, @unchecked Sendable {
             "ps:12346":   "ttys002\n",
             "ps:12347":   "ttys003\n",
         ])
-        let procs = try ShellProcessEnumerator(runner: runner).enumerateClaudeProcesses()
+        let procs = try ShellProcessEnumerator(runner: runner, envReader: FakeEnvReader()).enumerateClaudeProcesses()
         #expect(procs.count == 3)
         #expect(procs[0].pid == 12345)
         #expect(procs[0].cwd == "/Users/joe/projects/foo")
@@ -76,7 +88,7 @@ final class FakeShellRunner: ShellRunning, @unchecked Sendable {
             "lsof:999": "p999\nfcwd\nn/tmp\n",
             "ps:999":   "??\n",
         ])
-        let procs = try ShellProcessEnumerator(runner: runner).enumerateClaudeProcesses()
+        let procs = try ShellProcessEnumerator(runner: runner, envReader: FakeEnvReader()).enumerateClaudeProcesses()
         #expect(procs.count == 1)
         #expect(procs[0].tty == nil)
     }
@@ -89,7 +101,7 @@ final class FakeShellRunner: ShellRunning, @unchecked Sendable {
             "ps:111":    "ttys001\n",
             "ps:222":    "ttys002\n",
         ])
-        let procs = try ShellProcessEnumerator(runner: runner).enumerateClaudeProcesses()
+        let procs = try ShellProcessEnumerator(runner: runner, envReader: FakeEnvReader()).enumerateClaudeProcesses()
         #expect(procs.count == 1)
         #expect(procs[0].pid == 111)
     }
@@ -112,7 +124,7 @@ final class FakeShellRunner: ShellRunning, @unchecked Sendable {
             "ps:200":      "ttys002\n",
             "ps:300":      "ttys003\n",
         ])
-        let procs = try ShellProcessEnumerator(runner: runner).enumerateClaudeProcesses()
+        let procs = try ShellProcessEnumerator(runner: runner, envReader: FakeEnvReader()).enumerateClaudeProcesses()
         #expect(procs.count == 1)
         #expect(procs[0].pid == 100)
     }
@@ -125,11 +137,52 @@ final class FakeShellRunner: ShellRunning, @unchecked Sendable {
             "lsof:555": "p555\nfcwd\nn/some/path\n",
             "ps:555":   "ttys004\n",
         ])
-        _ = try ShellProcessEnumerator(runner: runner).enumerateClaudeProcesses()
+        _ = try ShellProcessEnumerator(runner: runner, envReader: FakeEnvReader()).enumerateClaudeProcesses()
         let lsofCall = runner.calls.first { $0.0.hasSuffix("/lsof") }
         #expect(lsofCall != nil, "lsof should have been invoked")
         #expect(lsofCall!.1.contains("-a"),
                 "lsof MUST be called with -a to AND the -p and -d filters")
+    }
+
+    // MARK: - iter-067 env-var propagation
+
+    @Test func extractsTermProgramAndVscodePidFromEnv() throws {
+        let runner = FakeShellRunner(outputs: [
+            "pgrep":    "555\n",
+            "lsof:555": "p555\nfcwd\nn/x\n",
+            "ps:555":   "ttys001\n",
+        ])
+        let envReader = FakeEnvReader([
+            555: [
+                "TERM_PROGRAM": "vscode",
+                "VSCODE_PID": "98765",
+                "ITERM_SESSION_ID": "w0t0p0:DEADBEEF",
+                "TERM_SESSION_ID": "ABC-DEF",
+                "HOME": "/Users/test",  // ignored
+            ],
+        ])
+        let procs = try ShellProcessEnumerator(runner: runner, envReader: envReader)
+            .enumerateClaudeProcesses()
+        #expect(procs.count == 1)
+        #expect(procs[0].termProgram == "vscode")
+        #expect(procs[0].vscodePid == 98765)
+        #expect(procs[0].iTermSessionId == "w0t0p0:DEADBEEF")
+        #expect(procs[0].termSessionId == "ABC-DEF")
+    }
+
+    @Test func missingEnvLeavesNil() throws {
+        let runner = FakeShellRunner(outputs: [
+            "pgrep":    "777\n",
+            "lsof:777": "p777\nfcwd\nn/y\n",
+            "ps:777":   "ttys002\n",
+        ])
+        let procs = try ShellProcessEnumerator(runner: runner, envReader: FakeEnvReader())
+            .enumerateClaudeProcesses()
+        #expect(procs.count == 1)
+        #expect(procs[0].termProgram == nil)
+        #expect(procs[0].vscodePid == nil)
+        #expect(procs[0].iTermSessionId == nil)
+        #expect(procs[0].termSessionId == nil)
     }
 
     @Test func excludesClaudeExeEvenIfFirstInList() throws {
@@ -143,7 +196,7 @@ final class FakeShellRunner: ShellRunning, @unchecked Sendable {
             "ps:100":      "ttys001\n",
             "ps:200":      "ttys002\n",
         ])
-        let procs = try ShellProcessEnumerator(runner: runner).enumerateClaudeProcesses()
+        let procs = try ShellProcessEnumerator(runner: runner, envReader: FakeEnvReader()).enumerateClaudeProcesses()
         #expect(procs.count == 1)
         #expect(procs[0].pid == 100)
     }

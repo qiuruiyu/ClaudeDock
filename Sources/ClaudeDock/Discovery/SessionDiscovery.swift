@@ -21,6 +21,7 @@ struct DiscoveredSession: Equatable, Sendable {
     let transcriptPath: String
     let status: SessionStatus
     let lastEventAt: Date
+    let hint: TerminalHint    // iter-067 — env-derived; routes the focus strategy
 }
 
 final class SessionDiscovery: Sendable {
@@ -54,11 +55,24 @@ final class SessionDiscovery: Sendable {
                 ppid: p.pid,           // claude's own PID — matches hook.sh's $PPID
                 tty: p.tty
             )
+            // Reconstruct the same TerminalHint a hook would have produced,
+            // so the focus strategy (TerminalFocuser dispatch) and any
+            // .ppid-keyed reaper/watch work identically for discovered and
+            // hook-tracked sessions.
+            let hint = TerminalHint(
+                ppid: p.pid,
+                tty: p.tty,
+                termProgram: p.termProgram,
+                iTermSessionId: p.iTermSessionId,
+                termSessionId: p.termSessionId,
+                vscodePid: p.vscodePid
+            )
             return DiscoveredSession(
                 identity: identity,
                 transcriptPath: ref.path.path,
                 status: status,
-                lastEventAt: ref.mtime
+                lastEventAt: ref.mtime,
+                hint: hint
             )
         }
         log.info("Discovery: surfaced \(results.count)/\(procs.count) running session(s)")

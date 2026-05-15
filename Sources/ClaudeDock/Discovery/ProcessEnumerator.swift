@@ -14,7 +14,13 @@ import Logging
 struct ClaudeProcess: Equatable, Sendable {
     let pid: Int32
     let cwd: String
-    let tty: String?   // e.g. "/dev/ttys001"; nil if not a tty
+    let tty: String?            // e.g. "/dev/ttys001"; nil if not a tty
+    // Env-derived (iter-067). nil for processes owned by other users
+    // or when KERN_PROCARGS2 fails.
+    let termProgram: String?    // TERM_PROGRAM — e.g. "vscode", "iTerm.app"
+    let vscodePid: Int32?       // VSCODE_PID — set in VS Code integrated terminals
+    let iTermSessionId: String? // ITERM_SESSION_ID
+    let termSessionId: String?  // TERM_SESSION_ID
 }
 
 protocol ShellRunning: Sendable {
@@ -42,11 +48,15 @@ protocol ProcessEnumerating: Sendable {
 
 struct ShellProcessEnumerator: ProcessEnumerating {
     let runner: ShellRunning
+    let envReader: ProcessEnvReading
     let limit: Int
     private let log = Logger(label: "claudedock.discovery.proc")
 
-    init(runner: ShellRunning = ProcessShellRunner(), limit: Int = 32) {
+    init(runner: ShellRunning = ProcessShellRunner(),
+         envReader: ProcessEnvReading = DarwinProcessEnvReader(),
+         limit: Int = 32) {
         self.runner = runner
+        self.envReader = envReader
         self.limit = limit
     }
 
@@ -65,7 +75,16 @@ struct ShellProcessEnumerator: ProcessEnumerating {
         return pids.compactMap { pid in
             guard let cwd = readCWD(pid: pid) else { return nil }
             let tty = readTTY(pid: pid)
-            return ClaudeProcess(pid: pid, cwd: cwd, tty: tty)
+            let env = envReader.readEnv(pid: pid)
+            return ClaudeProcess(
+                pid: pid,
+                cwd: cwd,
+                tty: tty,
+                termProgram: env["TERM_PROGRAM"],
+                vscodePid: env["VSCODE_PID"].flatMap(Int32.init),
+                iTermSessionId: env["ITERM_SESSION_ID"],
+                termSessionId: env["TERM_SESSION_ID"]
+            )
         }
     }
 

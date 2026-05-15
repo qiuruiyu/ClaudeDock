@@ -87,10 +87,14 @@ final class SessionStore: ObservableObject {
     /// Returns early if the fingerprint is already tracked or forgotten —
     /// when a real hook later fires for the same `(cwd, ppid, tty)` triple,
     /// the existing fingerprint-match logic in `ingest` merges it.
+    /// The `hint` carries TERM_PROGRAM / VSCODE_PID / ITERM_SESSION_ID
+    /// values read from the claude process's env (iter-067) so the focus
+    /// strategy works identically for discovered and hook-tracked rows.
     func injectDiscovered(identity: SessionIdentity,
                           transcriptPath: String,
                           status: SessionStatus,
-                          lastEventAt: Date) {
+                          lastEventAt: Date,
+                          hint: TerminalHint = TerminalHint()) {
         if forgottenIds.contains(identity.fingerprint) { return }
         if sessions.contains(where: { $0.identity.fingerprint == identity.fingerprint }) {
             return
@@ -102,7 +106,7 @@ final class SessionStore: ObservableObject {
                         status: status,
                         lastEventAt: lastEventAt,
                         transcriptPath: transcriptPath,
-                        hint: TerminalHint())
+                        hint: hint)
         sessions.append(s)
         try? aliases.save()
         recomputeSameCwdIndices()
