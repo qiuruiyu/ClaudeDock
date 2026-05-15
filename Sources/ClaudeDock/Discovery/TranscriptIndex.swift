@@ -124,14 +124,26 @@ struct TranscriptIndex: Sendable {
     private static func makeRef(jsonlURL: URL) -> TranscriptRef? {
         guard let fh = try? FileHandle(forReadingFrom: jsonlURL) else { return nil }
         defer { try? fh.close() }
-        let chunk = try? fh.read(upToCount: 8192)
+        // Claude Code transcripts begin with several metadata entries
+        // (last-prompt, permission-mode, file-history-snapshot,
+        // hook_success, etc.) before the first message-bearing entry.
+        // The top-level `cwd` field doesn't appear until 3–6 lines in.
+        // 32 KB is plenty — message lines can be a few KB each.
+        let chunk = try? fh.read(upToCount: 32_768)
         guard let data = chunk, let s = String(data: data, encoding: .utf8) else { return nil }
-        guard let firstLine = s.split(whereSeparator: \.isNewline).first(where: { !$0.isEmpty }),
-              let lineData = String(firstLine).data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-              let cwd = json["cwd"] as? String, !cwd.isEmpty else {
-            return nil
+
+        var foundCwd: String?
+        for line in s.split(whereSeparator: \.isNewline) {
+            guard !line.isEmpty,
+                  let lineData = String(line).data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                  let c = json["cwd"] as? String, !c.isEmpty
+            else { continue }
+            foundCwd = c
+            break
         }
+        guard let cwd = foundCwd else { return nil }
+
         let mtime = (try? jsonlURL.resourceValues(forKeys: [.contentModificationDateKey]))?
             .contentModificationDate ?? Date(timeIntervalSince1970: 0)
         let sessionId = jsonlURL.deletingPathExtension().lastPathComponent

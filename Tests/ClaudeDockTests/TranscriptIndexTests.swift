@@ -104,6 +104,35 @@ import Testing
                 "Fallback scan should find it even when encoded-dir lookup misses")
     }
 
+    // MARK: - real Claude Code transcript shape
+
+    @Test func findsCwdEvenWhenMetadataEntriesComeFirst() {
+        // Real Claude Code JSONLs lead with metadata entries that have
+        // NO top-level cwd (last-prompt, permission-mode, file-history-
+        // snapshot, etc.). The cwd appears later, in entries like
+        // `attachment` or `user`. Reading only the first line returns
+        // nil — which is the iter-069 follow-on bug that hid the user's
+        // Ghostty/zjuthesis sessions.
+        let root = makeTempRoot()
+        let cwd = "/Users/test/realistic"
+        let encoded = TranscriptIndex.encodeProjectsDirName(for: cwd)
+        let lines = [
+            #"{"type":"last-prompt","prompt":"hi"}"#,
+            #"{"type":"permission-mode","permissionMode":"auto"}"#,
+            #"{"type":"file-history-snapshot","messageId":"abc","snapshot":{"trackedFileBackups":{}}}"#,
+            // First line with top-level cwd:
+            #"{"type":"attachment","cwd":"\#(cwd)","userType":"external"}"#,
+            // Later lines also have cwd:
+            #"{"type":"user","cwd":"\#(cwd)","message":{"role":"user","content":"hi"}}"#,
+        ]
+        _ = writeTranscript(lines.joined(separator: "\n") + "\n",
+                           to: root, subdir: encoded, sessionId: "real")
+        let idx = TranscriptIndex.build(at: root)
+        let ref = idx.transcript(forCwd: cwd)
+        #expect(ref?.sessionId == "real")
+        #expect(ref?.cwd == cwd)
+    }
+
     // MARK: - scale: lots of unrelated transcripts
 
     @Test func unaffectedByManyUnrelatedTranscripts() {
